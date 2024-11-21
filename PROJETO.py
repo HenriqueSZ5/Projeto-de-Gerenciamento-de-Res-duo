@@ -139,13 +139,13 @@ def open_main_window(username):
                     padding=5)
 
     ttk.Button(main_window, text="Estoque de Resíduos", command=view_data).grid(row=1, column=0, columnspan=2, pady=5)
-    """ttk.Button(main_window, text="Banco de Coleta", command=insert_data1).grid(row=8, column=0, columnspan=2, pady=5)
+    ttk.Button(main_window, text="Banco de Coleta", command=insert_data1).grid(row=8, column=0, columnspan=2, pady=5)
     ttk.Button(main_window, text="Sepação de Resíduo", command=insert_data2).grid(row=2, column=0, columnspan=2, pady=5)
     
     ttk.Button(main_window, text="Remover Resíduo", command=delete_data).grid(row=4, column=0, columnspan=2, pady=5)
     ttk.Button(main_window, text="Venda de Resíduo", command=insert_data3).grid(row=5, column=0, columnspan=2, pady=5)
 
-    ttk.Button(main_window, text="Sair", command=main_window.quit).grid(row=6, column=0, columnspan=2, pady=5)"""
+    ttk.Button(main_window, text="Sair", command=main_window.quit).grid(row=6, column=0, columnspan=2, pady=5)
 
     main_window.grid_columnconfigure(0, weight=1)
     main_window.grid_columnconfigure(1, weight=1)
