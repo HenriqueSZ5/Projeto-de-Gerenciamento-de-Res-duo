@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
+import os
 
 app = Flask(__name__)
 app.secret_key = "sua_chave_secreta"
@@ -392,4 +393,5 @@ def delete_residuo():
     return render_template("delete_residuo.html")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Use a porta definida pelo Render ou 5000 como fallback
+    app.run(host="0.0.0.0", port=port)
