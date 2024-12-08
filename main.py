@@ -7,15 +7,15 @@ app.secret_key = "sua_chave_secreta"
 def conectar_banco():
     try:
         conexao = mysql.connector.connect(
-            host="junction.proxy.rlwy.net",  # Atualizado o host
-            port=40233,                      # Atualizada a porta
-            user="root",                     # Usuário
-            password="myYTCNnwIWMrjhvBhflvqdHIkeQSKCWR",  # Senha
-            database="railway"               # Apenas o nome do banco
+            host="autorack.proxy.rlwy.net",  
+            port=18583,                     
+            user="root",                     
+            password="LRGnqrjbhzlbkvyeWIuZLKzSVpGdgTGN", 
+            database="railway"               
         )
         return conexao
     except mysql.connector.Error as erro:
-        print(f"Erro ao conectar ao banco de dados: {erro}")  # Debug
+        print(f"Erro ao conectar ao banco de dados: {erro}") 
         return None
 
 

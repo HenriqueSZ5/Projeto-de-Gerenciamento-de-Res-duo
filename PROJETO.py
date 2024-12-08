@@ -1,38 +1,99 @@
-import tkinter as tk
-from tkinter import ttk
-from tkinter import messagebox
+from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
-from datetime import datetime
-def formatar_data(data_iso):
-    try:
-        return datetime.strptime(data_iso, "%Y-%m-%d").strftime("%d/%m/%Y")
-    except ValueError:
-        return data_iso
-    
+
+app = Flask(__name__)
+app.secret_key = "sua_chave_secreta"
+
 def conectar_banco():
     try:
-        return mysql.connector.connect(
-            host="localhost",
-            port= "3306",
-            user="root",
-            password="root",
-            database="db_coleta"
+        conexao = mysql.connector.connect(
+            host="autorack.proxy.rlwy.net",  # Atualizado o host
+            port=18583,                      # Atualizada a porta
+            user="root",                     # Usuário
+            password="LRGnqrjbhzlbkvyeWIuZLKzSVpGdgTGN",  # Nova senha
+            database="railway"               # Apenas o nome do banco
         )
-    except mysql.connector.Error as err:
-        messagebox.showerror("Erro", f"Erro ao conectar ao banco de dados: {str(err)}")
+        return conexao
+    except mysql.connector.Error as erro:
+        print(f"Erro ao conectar ao banco de dados: {erro}")  # Mensagem de depuração
         return None
 
-def login():
-    username = entry_username.get().strip()
-    senha = entry_senha.get().strip()
 
-    if not (username and senha):
-        messagebox.showwarning("Aviso", "Nome de usuário e senha não podem estar vazios.")
-        return
+@app.route("/")
+def index():
+    return render_template("login.html")
+
+@app.route("/cadastro", methods=["GET", "POST"])
+def cadastro():
+    if request.method == "POST":
+        username = request.form["username"]
+        senha = request.form["senha"]
+        confirmar_senha = request.form["confirmar_senha"]
+
+        
+        if not (username and senha and confirmar_senha):
+            flash("Todos os campos devem ser preenchidos!", "warning")
+            return redirect(url_for("cadastro"))
+
+        
+        if senha != confirmar_senha:
+            flash("As senhas não coincidem!", "danger")
+            return redirect(url_for("cadastro"))
+
+        
+        conexao = conectar_banco()
+        if conexao is None:
+            flash("Erro ao conectar ao banco de dados.", "danger")
+            return redirect(url_for("cadastro"))
+
+        try:
+            cursor = conexao.cursor()
+
+            
+            cursor.execute("SELECT * FROM tabela_login WHERE username = %s", (username,))
+            if cursor.fetchone():
+                flash("Usuário já existe! Escolha outro nome.", "warning")
+                return redirect(url_for("cadastro"))
+
+           
+            query = """
+                INSERT INTO tabela_login (username, senha)
+                VALUES (%s, %s)
+            """
+            valores = (username, senha)
+            cursor.execute(query, valores)
+            conexao.commit()
+
+            flash("Cadastro realizado com sucesso!", "success")
+            return redirect(url_for("index"))
+
+        except Exception as e:
+            print(f"Erro: {str(e)}")  # Adicione esta linha para debug
+            flash(f"Erro ao realizar cadastro: {str(e)}", "danger")
+            return redirect(url_for("cadastro"))
+
+        finally:
+            cursor.close()
+            conexao.close()
+
+  
+    return render_template("cadastro.html")
+
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    username = request.form["username"]
+    senha = request.form["senha"]
+
+    if not username or not senha:
+        flash("Nome de usuário e senha não podem estar vazios.", "warning")
+        return redirect(url_for("index"))
 
     conexao = conectar_banco()
     if conexao is None:
-        return
+        flash("Erro ao conectar ao banco de dados.", "danger")
+        return redirect(url_for("index"))
 
     try:
         cursor = conexao.cursor()
@@ -40,376 +101,295 @@ def login():
         result = cursor.fetchone()
 
         if result:
-            messagebox.showinfo("Sucesso", f"Login bem-sucedido como {username}!")
-            root.destroy()
-            open_main_window(username)
+            flash(f"Login bem-sucedido como {username}!", "success")
+            return redirect(url_for("dashboard", username=username))
         else:
-            messagebox.showwarning("Aviso", "Usuário ou senha incorretos.")
+            flash("Usuário ou senha incorretos.", "warning")
+            return redirect(url_for("index"))
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao verificar login: {str(e)}")
+        flash(f"Erro ao verificar login: {str(e)}", "danger")
+        return redirect(url_for("index"))
     finally:
         cursor.close()
         conexao.close()
-    
-def open_main_window(username):
-    main_window = tk.Tk()
-    main_window.title("Coletin")
-    main_window.geometry("600x400")
-    main_window.configure(bg="#91bd8f")
 
-    def update_capacity_chart():
- 
+@app.route("/dashboard/<username>")
+def dashboard(username):
+    return render_template("dashboard.html", username=username)
+
+
+
+@app.route("/add_separacao", methods=["GET", "POST"])
+def add_separacao():
+    if request.method == "POST":
+        tipo = request.form.get("tipo").strip().lower()
+        data_separacao = request.form.get("data_separacao")
+        kg = request.form.get("kg")
+
+        if not (tipo and data_separacao and kg):
+            flash("Todos os campos devem ser preenchidos!", "warning")
+            return redirect(url_for("add_separacao"))
+
+        try:
+            kg = float(kg)
+        except ValueError:
+            flash("O campo 'kg' deve ser um número!", "danger")
+            return redirect(url_for("add_separacao"))
+
+        tipo_cod_item_map = {
+            "aluminio": 1,
+            "cobre": 2,
+            "aco": 3,
+            "ferro": 4
+        }
+        cod_item = tipo_cod_item_map.get(tipo)
+
+        if cod_item is None:
+            flash("Tipo inválido! Use: Aluminio, Cobre, Aço ou Ferro.", "warning")
+            return redirect(url_for("add_separacao"))
+
         conexao = conectar_banco()
         if conexao is None:
-            return
+            flash("Erro ao conectar ao banco de dados.", "danger")
+            return redirect(url_for("add_separacao"))
 
         try:
             cursor = conexao.cursor()
-            cursor.execute("SELECT SUM(quantidade) FROM tb_crioprotetores")
-            total = cursor.fetchone()[0] or 0
-
-            cursor.close()
-            conexao.close()
-
-            ocupado = min(total, 1000)
-            livre = max(0, 1000 - ocupado)
-
-            ax.clear()
-            ax.pie(
-                [ocupado, livre],
-                labels=["Ocupado", "Disponível"],
-                autopct='%1.1f%%',
-                colors=["#ff9999", "#99ff99"],
-                startangle=90,
-            )
-            ax.set_title("Capacidade do Biodigestor (Máx: 1000)")
-            canvas.draw()
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao buscar dados: {str(e)}")
-    
-    def insert_data():
-    
-        crioprotetores = entry_crioprotetor.get().strip().lower()
-        temperatura = entry_temperatura.get().strip().capitalize()
-        quantidade = entry_quantidade.get()
-
-        if not (crioprotetores and temperatura and quantidade.isdigit()):
-            messagebox.showwarning("Aviso", "Por favor, preencha todos os campos corretamente.")
-            return
-
-        quantidade = int(quantidade)
-        conexao = conectar_banco()
-        if conexao is None:
-            return
-
-        try:
-            cursor = conexao.cursor()
-            cursor.execute("SELECT SUM(quantidade) FROM tb_crioprotetores")
-            total_atual = cursor.fetchone()[0] or 0
-
-            if total_atual + quantidade > 1000:
-                messagebox.showwarning("Aviso", "A quantidade excederia o limite máximo de 1000 unidades no biodigestor.")
-                return
-
-            sql = "INSERT INTO tb_crioprotetores (crioprotetores, temperatura, quantidade, usuario_id) VALUES (%s, %s, %s, (SELECT id FROM tb_usuarios WHERE username = %s))"
-            valores = (crioprotetores, temperatura, quantidade, username)
-            cursor.execute(sql, valores)
+            query = """
+                INSERT INTO tbl_separacao (tipo, data_separacao, kg, cod_item)
+                VALUES (%s, %s, %s, %s)
+            """
+            valores = (tipo.capitalize(), data_separacao, kg, cod_item)
+            cursor.execute(query, valores)
             conexao.commit()
-            messagebox.showinfo("Sucesso", "Dados inseridos com sucesso!")
 
-            update_capacity_chart()
-
+            flash("Informações adicionadas com sucesso!", "success")
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao inserir dados: {str(e)}")
+            flash(f"Erro ao adicionar informações: {str(e)}", "danger")
         finally:
             cursor.close()
             conexao.close()
 
-        clear_entries()
+       
+        return redirect(url_for("view_separacao"))
 
-    def delete_data():
-        crioprotetores = entry_crioprotetor.get().strip().lower()
+    return render_template("add_separacao.html")
+
+
+
+
+@app.route("/view_separacao")
+def view_separacao():
+    conexao = conectar_banco()
+    if conexao is None:
+        flash("Erro ao conectar ao banco de dados.", "danger")
+        return redirect(url_for("dashboard", username="user"))
+
+    try:
+        cursor = conexao.cursor()
+        cursor.execute("SELECT * FROM tbl_separacao")
+        registros = cursor.fetchall()
+        return render_template("view_separacao.html", registros=registros)
+    except Exception as e:
+        flash(f"Erro ao buscar dados: {str(e)}", "danger")
+        return redirect(url_for("dashboard", username="user"))
+    finally:
+        cursor.close()
+        conexao.close()
+
+
+@app.route("/add_coleta", methods=["GET", "POST"])
+def add_coleta():
+    if request.method == "POST":
+       
+        data_coleta = request.form.get("data_coleta")
+        kg = request.form.get("kg")
+
+      
+        if not (data_coleta and kg):
+            flash("Todos os campos devem ser preenchidos!", "warning")
+            return redirect(url_for("add_coleta"))
+
+        
+        try:
+            kg = float(kg)
+        except ValueError:
+            flash("A kg deve ser um número!", "danger")
+            return redirect(url_for("add_coleta"))
+
+       
+        conexao = conectar_banco()
+        if conexao is None:
+            flash("Erro ao conectar ao banco de dados.", "danger")
+            return redirect(url_for("add_coleta"))
+
+        try:
+            
+            cursor = conexao.cursor()
+            query = """
+                INSERT INTO tbl_coleta (data_coleta, kg)
+                VALUES (%s, %s)
+            """
+            valores = (data_coleta, kg)
+            cursor.execute(query, valores)
+            conexao.commit()
+
+            flash("Informações adicionadas com sucesso!", "success")
+        except Exception as e:
+            flash(f"Erro ao adicionar informações: {str(e)}", "danger")
+        finally:
+            cursor.close()
+            conexao.close()
+
+        return redirect(url_for("view_coleta"))  
+
+   
+    return render_template("add_coleta.html")
+
+@app.route("/add_venda", methods=["GET", "POST"])
+def add_venda():
+    if request.method == "POST":
+        tipo = request.form.get("tipo").strip().lower()
+        data_venda = request.form.get("data_venda")
+        kg = request.form.get("kg")
+        valor_total = request.form.get("valor_total")
+
+        # Validações básicas
+        if not (tipo and data_venda and kg and valor_total):
+            flash("Todos os campos devem ser preenchidos!", "warning")
+            return redirect(url_for("add_venda"))
+
+        try:
+            kg = float(kg)
+            valor_total = float(valor_total)
+        except ValueError:
+            flash("Os campos 'kg' e 'valor_total' devem ser números!", "danger")
+            return redirect(url_for("add_venda"))
+
+        tipo_cod_item_map = {
+            "aluminio": 1,
+            "cobre": 2,
+            "aco": 3,
+            "ferro": 4
+        }
+        cod_item = tipo_cod_item_map.get(tipo)
+
+        if cod_item is None:
+            flash("Tipo inválido! Use: Aluminio, Cobre, Aço ou Ferro.", "warning")
+            return redirect(url_for("add_venda"))
 
         conexao = conectar_banco()
         if conexao is None:
-            return
+            flash("Erro ao conectar ao banco de dados.", "danger")
+            return redirect(url_for("add_venda"))
 
         try:
             cursor = conexao.cursor()
-            sql = "DELETE FROM tb_crioprotetores WHERE crioprotetores = %s"
-            valores = (crioprotetores,)
-            cursor.execute(sql, valores)
+            query = """
+                INSERT INTO tbl_venda (tipo, data_venda, kg, valor_total, cod_item)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            valores = (tipo.capitalize(), data_venda, kg, valor_total, cod_item)
+            cursor.execute(query, valores)
+            conexao.commit()
+
+            flash("Venda adicionada com sucesso!", "success")
+        except Exception as e:
+            flash(f"Erro ao adicionar venda: {str(e)}", "danger")
+        finally:
+            cursor.close()
+            conexao.close()
+
+        # Redireciona para view_venda após sucesso
+        return redirect(url_for("view_venda"))
+
+    return render_template("add_venda.html")
+
+
+@app.route("/view_coleta")
+def view_coleta():
+    conexao = conectar_banco()
+    if conexao is None:
+        flash("Erro ao conectar ao banco de dados.", "danger")
+        return redirect(url_for("dashboard", username="user"))
+
+    try:
+        cursor = conexao.cursor()
+        cursor.execute("SELECT * FROM tbl_coleta")
+        registros = cursor.fetchall()
+        return render_template("view_coleta.html", registros=registros)
+    except Exception as e:
+        flash(f"Erro ao buscar dados: {str(e)}", "danger")
+        return redirect(url_for("dashboard", username="user"))
+    finally:
+        cursor.close()
+        conexao.close()
+
+
+@app.route("/view_venda")
+def view_venda():
+    conexao = conectar_banco()
+    if conexao is None:
+        flash("Erro ao conectar ao banco de dados.", "danger")
+        return redirect(url_for("dashboard", username="user"))
+
+    try:
+        cursor = conexao.cursor()
+        cursor.execute("SELECT * FROM tbl_venda")
+        registros = cursor.fetchall()
+        return render_template("view_venda.html", registros=registros)
+    except Exception as e:
+        flash(f"Erro ao buscar dados: {str(e)}", "danger")
+        return redirect(url_for("dashboard", username="user"))
+    finally:
+        cursor.close()
+        conexao.close()
+
+
+@app.route("/delete_residuo", methods=["GET", "POST"])
+def delete_residuo():
+    if request.method == "POST":
+        tipo = request.form["tipo"]
+        data = request.form["data"]
+        quantidade = request.form["quantidade"]
+
+        if not (tipo and data and quantidade):
+            flash("Todos os campos devem ser preenchidos!", "warning")
+            return redirect(url_for("delete_residuo"))
+
+        try:
+            quantidade = float(quantidade)  
+        except ValueError:
+            flash("A quantidade deve ser um número!", "danger")
+            return redirect(url_for("delete_residuo"))
+
+        conexao = conectar_banco()
+        if conexao is None:
+            flash("Erro ao conectar ao banco de dados.", "danger")
+            return redirect(url_for("delete_residuo"))
+
+        try:
+            cursor = conexao.cursor()
+            query = """
+                DELETE FROM tbl_separacao
+                WHERE tipo = %s AND data_separacao = %s AND kg = %s
+            """
+            valores = (tipo, data, quantidade)
+            cursor.execute(query, valores)
             conexao.commit()
 
             if cursor.rowcount > 0:
-                messagebox.showinfo("Sucesso", f"Dados deletados com sucesso para {crioprotetores}")
+                flash("Resíduo removido com sucesso!", "success")
             else:
-                messagebox.showwarning("Aviso", f"Nenhum crioprotetor encontrado com o nome {crioprotetores}")
+                flash("Nenhum resíduo encontrado com os critérios informados.", "info")
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao deletar dados: {str(e)}")
+            flash(f"Erro ao remover resíduo: {str(e)}", "danger")
         finally:
             cursor.close()
             conexao.close()
+        return redirect(url_for("dashboard", username="user"))
 
-        clear_entries()
+    return render_template("delete_residuo.html")
 
-    def view_data():
-        conexao = conectar_banco()
-        if conexao is None:
-            return
-
-        try:
-            cursor = conexao.cursor()
-            cursor.execute("SELECT * FROM tbl_separacao")
-            registros = cursor.fetchall()
-
-            dados = "\n".join([
-    f"ID: {row[0]}, Data de Separação: {formatar_data(row[1])}, Codigo do Item: {row[2]}, Tipo: {row[3]}, Kg: {row[4]}"
-    for row in registros])
-            if dados:
-                messagebox.showinfo("Dados", dados)
-            else:
-                messagebox.showinfo("Dados", "Nenhum dado encontrado.")
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao buscar dados: {str(e)}")
-        finally:
-            cursor.close()
-            conexao.close()
-
-    def insert_data1():
-        conexao = conectar_banco()
-        if conexao is None:
-            return
-
-        try:
-            cursor = conexao.cursor()
-            cursor.execute("SELECT * FROM tbl_coleta")
-            registros = cursor.fetchall()
-
-
-            dados = "\n".join([f"ID: {row[0]}, Data de Coleta: {formatar_data(row[1])}, Quantidade de Caçamba: {row[2]}, Kg de Resíduos Coletos: {row[3]}"
-    for row in registros])
-            if dados:
-                messagebox.showinfo("Dados", dados)
-            else:
-                messagebox.showinfo("Dados", "Nenhum dado encontrado.")
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao buscar dados: {str(e)}")
-        finally:
-            cursor.close()
-            conexao.close()
-
-    ttk.Button(main_window, text="Atualizar Gráfico", command=update_capacity_chart).grid(row=8, column=2, pady=5)
-    tk.Label(main_window, text="Crioprotetor:", bg="#a2d5ab", font=("Helvetica", 10, "bold")).grid(row=0, column=0, pady=5, padx=10, sticky="e")
-    entry_crioprotetor = tk.Entry(main_window, font=("Helvetica", 10))
-    entry_crioprotetor.grid(row=0, column=1, pady=5, padx=10, sticky="w")
-
-
-    def insert_data2():
-        conexao = conectar_banco()
-        if conexao is None:
-            return
-
-        try:
-            cursor = conexao.cursor()
-            cursor.execute("SELECT * FROM tbl_separacao")
-            registros = cursor.fetchall()
-
-            dados = "\n".join([f"ID: {row[0]}, Data de Separação: {formatar_data(row[1])}, Código do Item: {row[2]}, Tipo do Resíduo: {row[3]}, Kg: {row[4]}"
-            for row in registros])
-            if dados:
-                messagebox.showinfo("Dados", dados)
-            else:
-                messagebox.showinfo("Dados", "Nenhum dado encontrado.")
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao buscar dados: {str(e)}")
-        finally:
-            cursor.close()
-            conexao.close()
-
-    def insert_data3():
-        conexao = conectar_banco()
-        if conexao is None:
-            return
-
-        try:
-            cursor = conexao.cursor()
-            cursor.execute("SELECT * FROM tbl_venda")
-            registros = cursor.fetchall()
-
-            dados = "\n".join([
-            f"ID: {row[0]}, Data da Venda: {formatar_data(row[1])}, Código do Item: {row[2]}, Tipo do Resíduo: {row[3]}, Kg: {row[4]}"
-            for row in registros])
-            if dados:
-                messagebox.showinfo("Dados", dados)
-            else:
-                messagebox.showinfo("Dados", "Nenhum dado encontrado.")
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao buscar dados: {str(e)}")
-        finally:
-            cursor.close()
-            conexao.close()
-
-    def delete_data():
-        def confirmar_remocao():
-        
-            nome = entry_nome.get()
-            data = entry_data.get()
-            quantidade = entry_quantidade.get()
-
-            if not nome or not data or not quantidade:
-                messagebox.showwarning("Aviso", "Todos os campos devem ser preenchidos!")
-                return
-
-            try:
-                quantidade = float(quantidade)  
-            except ValueError:
-                messagebox.showerror("Erro", "A quantidade deve ser um número!")
-                return
-
-            conexao = conectar_banco()
-            if conexao is None:
-                return
-
-            try:
-                cursor = conexao.cursor()
-                query = """
-                DELETE FROM tbl_separacao
-                WHERE tipo = %s AND data_separacao = %s AND kg = %s
-                """
-                valores = (nome, data, quantidade)
-                cursor.execute(query, valores)
-                conexao.commit()
-
-                if cursor.rowcount > 0:
-                    messagebox.showinfo("Sucesso", "Resíduo removido com sucesso!")
-                else:
-                    messagebox.showinfo("Aviso", "Nenhum resíduo encontrado com os critérios informados.")
-            except Exception as e:
-                messagebox.showerror("Erro", f"Erro ao remover resíduo: {str(e)}")
-            finally:
-                cursor.close()
-                conexao.close()
-                janela_remocao.destroy()  
-
-    
-    janela_remocao = tk.Toplevel(main_window)
-    janela_remocao.title("Remover Resíduo")
-
-    ttk.Label(janela_remocao, text="Nome do Resíduo:").grid(row=0, column=0, pady=5, padx=5, sticky="e")
-    entry_nome = ttk.Entry(janela_remocao)
-    entry_nome.grid(row=0, column=1, pady=5, padx=5)
-
-    ttk.Label(janela_remocao, text="Data da Separação (YYYY-MM-DD):").grid(row=1, column=0, pady=5, padx=5, sticky="e")
-    entry_data = ttk.Entry(janela_remocao)
-    entry_data.grid(row=1, column=1, pady=5, padx=5)
-
-
-    ttk.Label(janela_remocao, text="Quantidade (kg):").grid(row=2, column=0, pady=5, padx=5, sticky="e")
-    entry_quantidade = ttk.Entry(janela_remocao)
-    entry_quantidade.grid(row=2, column=1, pady=5, padx=5)
-
-    ttk.Button(janela_remocao, text="Confirmar", command=confirmar_remocao).grid(row=3, column=0, columnspan=2, pady=10)
-        
-
-    style = ttk.Style()
-    style.theme_use("clam")
-    style.configure("TButton",
-                    background="#4c3254",
-                    foreground="white",
-                    font=("Times New Roman", 12, "bold"),
-                    padding=5)
-    style = ttk.Style()
-    style.theme_use("clam")
-    style.configure("TButton",
-                    background="#4c3254",
-                    foreground="white",
-                    font=("Times New Roman", 12, "bold"),
-                    padding=5)
-    
-
-    ttk.Button(main_window, text="Estoque de Resíduos", command=view_data).grid(row=1, column=0, columnspan=2, pady=5)
-    ttk.Button(main_window, text="Banco de Coleta", command=insert_data1).grid(row=2, column=0, columnspan=2, pady=5)
-    ttk.Button(main_window, text="Sepação de Resíduo", command=insert_data2).grid(row=3, column=0, columnspan=2, pady=5)
-    
-    ttk.Button(main_window, text="Remover Resíduo", command=delete_data).grid(row=4, column=0, columnspan=2, pady=5)
-    ttk.Button(main_window, text="Venda de Resíduo", command=insert_data3).grid(row=5, column=0, columnspan=2, pady=5)
-
-    ttk.Button(main_window, text="Sair", command=main_window.quit).grid(row=6, column=0, columnspan=2, pady=5)
-
-    tk.Label(main_window, text="Crioprotetor:", bg="#a2d5ab", font=("Helvetica", 10, "bold")).grid(row=0, column=0, pady=5, padx=10, sticky="e")
-    entry_crioprotetor = tk.Entry(main_window, font=("Helvetica", 10))
-    entry_crioprotetor.grid(row=0, column=1, pady=5, padx=10, sticky="w")
-
-    tk.Label(main_window, text="Temperatura:", bg="#a2d5ab", font=("Helvetica", 10, "bold")).grid(row=1, column=0, pady=5, padx=10, sticky="e")
-    entry_temperatura = tk.Entry(main_window, font=("Helvetica", 10))
-    entry_temperatura.grid(row=1, column=1, pady=5, padx=10, sticky="w")
-
-    tk.Label(main_window, text="Quantidade:", bg="#a2d5ab", font=("Helvetica", 10, "bold")).grid(row=2, column=0, pady=5, padx=10, sticky="e")
-    entry_quantidade = tk.Entry(main_window, font=("Helvetica", 10))
-    entry_quantidade.grid(row=2, column=1, pady=5, padx=10, sticky="w")
-
-    ttk.Button(main_window, text="Adicionar bactéria", command=insert_data).grid(row=3, column=0, columnspan=2, pady=5)
-    ttk.Button(main_window, text="Visualizar Status", command=view_data).grid(row=5, column=0, columnspan=2, pady=5)
-    ttk.Button(main_window, text="Remover bactéria", command=delete_data).grid(row=4, column=0, columnspan=2, pady=5)
-    if role == 'admin':
-        ttk.Button(main_window, text="Registro", command=open_third_window).grid(row=6, column=0, columnspan=2, pady=5)
-    ttk.Button(main_window, text="Sair", command=main_window.quit).grid(row=7, column=0, columnspan=2, pady=5)
-
-    
-    fig = Figure(figsize=(3, 3), dpi=100)
-    ax = fig.add_subplot(111)
-
-    canvas = FigureCanvasTkAgg(fig, main_window)
-    canvas.get_tk_widget().grid(row=0, column=2, rowspan=8, padx=20, pady=10)
-
-    
-    ttk.Button(main_window, text="Atualizar Gráfico", command=update_capacity_chart).grid(row=8, column=2, pady=5)
-
-  
-    update_capacity_chart()
-
-
-    main_window.grid_columnconfigure(0, weight=1)
-    main_window.grid_columnconfigure(1, weight=1)
-    main_window.grid_columnconfigure(2, weight=1)
-
-    main_window.mainloop()
-
-root = tk.Tk()
-root.title("Login")
-root.geometry("400x300")
-root.configure(bg="#91bd8f")
-
-label_style = {
-    "bg": "#c8a1ff",
-    "fg": "#000000",
-    "font": ("Times New Roman", 12, "bold")
-}
-
-tk.Label(root, text="Nome de Usuário:", **label_style).grid(row=0, column=0, pady=20, padx=20, sticky="e")
-entry_username = tk.Entry(root, font=("Times New Roman", 12))
-entry_username.grid(row=0, column=1, pady=10, padx=20, sticky="w")
-
-tk.Label(root, text="Senha:", **label_style).grid(row=1, column=0, pady=20, padx=20, sticky="e")
-entry_senha = tk.Entry(root, font=("Times New Roman", 12), show='*')
-entry_senha.grid(row=1, column=1, pady=10, padx=20, sticky="w")
-
-style = ttk.Style()
-style.theme_use("clam")
-style.configure("TButton",
-                background="#4c3254",
-                foreground="white",
-                font=("Times New Roman", 12, "bold"),
-                padding=5)
-style.map("TButton",
-        background=[("active", "#4c3254")],
-        foreground=[("active", "white")])
-
-btn_login = ttk.Button(root, text="Entrar", command=login)
-btn_login.grid(row=2, column=0, columnspan=2, pady=20)
-
-root.grid_columnconfigure(0, weight=1)
-root.grid_columnconfigure(1, weight=1)
-
-root.mainloop()
+if __name__ == "__main__":
+    app.run(debug=True)
