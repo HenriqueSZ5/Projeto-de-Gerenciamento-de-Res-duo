@@ -225,7 +225,6 @@ def add_coleta():
             return redirect(url_for("add_coleta"))
 
         try:
-            
             cursor = conexao.cursor()
             query = """
                 INSERT INTO tbl_coleta (data_coleta, kg)
@@ -338,7 +337,21 @@ def view_venda():
         cursor = conexao.cursor()
         cursor.execute("SELECT * FROM tbl_venda")
         registros = cursor.fetchall()
-        return render_template("view_venda.html", registros=registros)
+
+        
+        registros_json = [
+            {
+                "id": r[0],
+                "data": r[1],
+                "codigo_item": r[2],
+                "tipo": r[3],
+                "kg": r[4],
+                "valor": r[5]
+            }
+            for r in registros
+        ]
+
+        return render_template("view_venda.html", registros=registros, registros_json=registros_json)
     except Exception as e:
         flash(f"Erro ao buscar dados: {str(e)}", "danger")
         return redirect(url_for("dashboard", username="user"))
@@ -393,5 +406,5 @@ def delete_residuo():
     return render_template("delete_residuo.html")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use a porta definida pelo Render ou 5000 como fallback
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
