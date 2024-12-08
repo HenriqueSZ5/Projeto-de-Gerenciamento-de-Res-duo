@@ -2,13 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
 import mysql.connector
-
 from datetime import datetime
-
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
-
 def formatar_data(data_iso):
     try:
         return datetime.strptime(data_iso, "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -362,17 +356,17 @@ def open_main_window(username):
         ttk.Button(main_window, text="Registro", command=open_third_window).grid(row=6, column=0, columnspan=2, pady=5)
     ttk.Button(main_window, text="Sair", command=main_window.quit).grid(row=7, column=0, columnspan=2, pady=5)
 
-    # Gráfico de capacidade
+    
     fig = Figure(figsize=(3, 3), dpi=100)
     ax = fig.add_subplot(111)
 
     canvas = FigureCanvasTkAgg(fig, main_window)
     canvas.get_tk_widget().grid(row=0, column=2, rowspan=8, padx=20, pady=10)
 
-    # Botão para atualizar o gráfico
+    
     ttk.Button(main_window, text="Atualizar Gráfico", command=update_capacity_chart).grid(row=8, column=2, pady=5)
 
-    # Atualiza o gráfico ao abrir a janela
+  
     update_capacity_chart()
 
 

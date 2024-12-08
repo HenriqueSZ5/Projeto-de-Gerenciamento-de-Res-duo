@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Bem-vindo, {{ username }}</h2>
+        <div class="mt-4">
+            <a href="/add_coleta" class="btn btn-danger mb-2">Adicionar Coleta</a>
+            <a href="/view_coleta" class="btn btn-success mb-2">Banco de Coleta</a>
+            <a href="/add_separacao" class="btn btn-primary mb-2">Adicionar Separação</a>
+            <a href="/view_separacao" class="btn btn-info mb-2">Estoque de Resíduos</a>
+            <a href="/add_venda" class="btn btn-warning mb-2">Adicionar Venda de Resíduos</a>
+            <a href="/view_venda" class="btn btn-dark mb-2">Venda de Resíduos</a>
+            <a href="/delete_residuo" class="btn btn-light mb-2">Remover Resíduo</a>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mt-3">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>

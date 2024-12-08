@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adicionar Separação</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Adicionar Separação</h1>
+        <form method="POST" action="{{ url_for('add_separacao') }}">
+            <div class="mb-3">
+                <label for="data_separacao" class="form-label">Data da Separação</label>
+                <input type="date" class="form-control" id="data_separacao" name="data_separacao" required>
+            </div>
+            <div class="mb-3">
+                <label for="tipo" class="form-label">Tipo</label>
+                <input type="text" class="form-control" id="tipo" name="tipo" required>
+            </div>
+            <div class="mb-3">
+                <label for="kg" class="form-label">Quantidade (kg)</label>
+                <input type="number" step="0.01" class="form-control" id="kg" name="kg" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Adicionar</button>
+            <a href="{{ url_for('view_separacao') }}" class="btn btn-secondary">Voltar</a>
+        </form>
+    </div>
+</body>
+</html>
