@@ -47,12 +47,10 @@
     </div>
 
     <script>
-        // Dados do backend passados pelo Flask (serializados em JSON)
         const vendas = {{ registros_json | tojson }};
         
-        // Processar dados para o gráfico
-        const labels = vendas.map(venda => venda.data); // Datas das vendas
-        const valores = vendas.map(venda => venda.valor); // Valores das vendas
+        const labels = vendas.map(venda => venda.data);
+        const valores = vendas.map(venda => venda.valor); 
     
         // Configurar e renderizar o gráfico
         const ctx = document.getElementById('vendasChart').getContext('2d');
