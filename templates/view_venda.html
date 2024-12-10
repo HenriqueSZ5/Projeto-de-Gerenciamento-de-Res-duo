@@ -37,7 +37,6 @@
             </tbody>
         </table>
 
-        <!-- Gráfico -->
         <div class="mt-5">
             <h3>Gráfico de Vendas</h3>
             <canvas id="vendasChart" width="400" height="200"></canvas>
@@ -52,7 +51,7 @@
         const labels = vendas.map(venda => venda.data);
         const valores = vendas.map(venda => venda.valor); 
     
-        // Configurar e renderizar o gráfico
+        
         const ctx = document.getElementById('vendasChart').getContext('2d');
         new Chart(ctx, {
             type: 'bar',
